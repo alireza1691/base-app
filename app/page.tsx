@@ -6,7 +6,7 @@ import SwapComponent from "@/components/swap";
 
 export default function Home() {
   return (
-    <div className={`${styles.container} `}>
+    <div className={`${styles.container} mb-20`}>
       <header className={styles.headerWrapper}>
         <Wallet />
       </header>
