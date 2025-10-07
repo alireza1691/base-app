@@ -3,14 +3,15 @@ import Image from "next/image";
 import styles from "./page.module.css";
 import { Wallet } from "@coinbase/onchainkit/wallet";
 import SwapComponent from "@/components/swap";
+import ChatComponent from "@/components/chat";
 
 export default function Home() {
   return (
-    <div className={`${styles.container} mb-20`}>
+    <div className={`${styles.container} mb-20 flex  flex-col items-center`}>
       <header className={styles.headerWrapper}>
         <Wallet />
       </header>
-
+      <ChatComponent />
       <div className={styles.content}>
         <Image
           priority
