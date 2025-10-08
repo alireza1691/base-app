@@ -35,6 +35,13 @@ const suggestionToHook: Record<SuggestionKey, string> = {
   "upcoming-unstaking": "Give me upcoming unstaking report",
   "ecosystem-movements": "Give me Ecosystem movement report",
 };
+export const wait = (seconds: number) => {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, seconds * 1000);
+  });
+};
 export default function ChatComponent() {
   const [selectedService, setSelectedService] = useState<SuggestionKey | null>(
     null
@@ -54,7 +61,8 @@ export default function ChatComponent() {
     {
       id: 0,
       from: "assistant",
-      content: "Hello! Please select a suggestion to start.",
+      content:
+        "👋 Hello! I'm  Wintelligence. I can analyze token activity, unstaking schedules, ecosystem movements, and more. Please note — I currently only support tokens launched in the Virtual ecosystem. Start by selecting one of the suggestions below to continue.",
     },
   ]);
   const { data: devReport, isLoading } = useDevMovementsReport(
@@ -173,22 +181,22 @@ export default function ChatComponent() {
       if (overview) {
         const { report, token_summary, quotes } = overview;
         if (report) reportSections.push(`### 📘 Token Overview\n\n${report}`);
-        if (token_summary)
-          reportSections.push(
-            `### 📈 Token Summary\n\n\`\`\`json\n${JSON.stringify(
-              token_summary,
-              null,
-              2
-            )}\n\`\`\``
-          );
-        if (quotes)
-          reportSections.push(
-            `### 💰 Market Data\n\n**Name:** ${quotes.name}\n**Symbol:** ${
-              quotes.symbol
-            }\n**Price (USD):** $${quotes.price_usd}\n**Market Cap:** $${Number(
-              quotes.market_cap_usd
-            ).toLocaleString()}`
-          );
+        // if (token_summary)
+        //   reportSections.push(
+        //     `### 📈 Token Summary\n\n\`\`\`json\n${JSON.stringify(
+        //       token_summary,
+        //       null,
+        //       2
+        //     )}\n\`\`\``
+        //   );
+        // if (quotes)
+        //   reportSections.push(
+        //     `### 💰 Market Data\n\n**Name:** ${quotes.name}\n**Symbol:** ${
+        //       quotes.symbol
+        //     }\n**Price (USD):** $${quotes.price_usd}\n**Market Cap:** $${Number(
+        //       quotes.market_cap_usd
+        //     ).toLocaleString()}`
+        //   );
       } else {
         errorDetected = true;
       }
@@ -343,6 +351,15 @@ export default function ChatComponent() {
         ...prev,
         {
           id: prev.length,
+          from: "user",
+          content: suggestion,
+        },
+      ]);
+      wait(1);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: prev.length,
           from: "assistant",
           content: `Please provide the token address for the "${suggestion}" analysis.`,
         },
@@ -350,22 +367,44 @@ export default function ChatComponent() {
     }
   };
   const handleSubmit = async () => {
-    if (!isValidEvmAddress(input)) {
+    // 🪄 1. Try to extract an EVM address from the input text
+    const match = input.match(/0x[a-fA-F0-9]{40}/);
+
+    if (!match) {
       setMessages((prev) => [
         ...prev,
         {
           id: prev.length,
           from: "assistant",
           content:
-            "Invalid address. Please enter a valid EVM address starting with 0x.",
+            "❌ No valid EVM address found. Please include a valid address starting with 0x.",
         },
       ]);
       return;
     }
 
-    // 👇 Instead of starting report fetch directly, first scan token info
-    await scanAddress(input);
+    // 🧠 2. Extracted address
+    const detectedAddress = match[0];
+
+    // 🧪 3. Validate (optional, since regex already ensures it's well-formed)
+    if (!isValidEvmAddress(detectedAddress)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: prev.length,
+          from: "assistant",
+          content:
+            "❌ Invalid address. Please enter a valid EVM address starting with 0x.",
+        },
+      ]);
+      return;
+    }
+
+    // ✅ 4. Set token address and scan
+    setTokenAddress(detectedAddress);
+    await scanAddress(detectedAddress);
   };
+
   const formatReport = (text: string) =>
     text
       .replace(
@@ -381,12 +420,12 @@ export default function ChatComponent() {
       .replace(/\n/g, "<br/>");
   return (
     <PromptInputProvider>
-      <div className="max-w-4xl mx-auto p-6 relative rounded-lg border h-full min-h-[400px] bg-gray-100 w-full">
+      <div className="max-w-4xl shadow-md h-fit mx-auto p-6 relative rounded-lg border  min-h-[400px] bg-white w-full">
         <Conversation>
           <ConversationContent>
             {messages.map((msg) => (
               <Message key={msg.id} from={msg.from}>
-                <MessageContent className="p-2">
+                <MessageContent variant={"contained"} className="p-2">
                   <div
                     className="text-sm leading-relaxed space-y-3"
                     dangerouslySetInnerHTML={{
@@ -414,24 +453,25 @@ export default function ChatComponent() {
             ))}
           </Suggestions>
 
-          {stage === "awaiting-address" && (
-            <Input
-              onSubmit={handleSubmit}
-              className="mt-4 w-full max-w-2xl mx-auto relative"
-            >
-              <PromptInputTextarea
-                value={input}
-                placeholder="Provide token address..."
-                onChange={(e) => setInput(e.currentTarget.value)}
-                className="pr-12"
-              />
-              <PromptInputSubmit
-                status="ready"
-                disabled={!input.trim()}
-                className="absolute bottom-1 right-1"
-              />
-            </Input>
-          )}
+          {/* {stage === "awaiting-address" && ( */}
+          <Input
+            onSubmit={handleSubmit}
+            className="mt-4 w-full max-w-2xl mx-auto relative"
+          >
+            <PromptInputTextarea
+              disabled={stage !== "awaiting-address"}
+              value={input}
+              placeholder="Enter message"
+              onChange={(e) => setInput(e.currentTarget.value)}
+              className="pr-12"
+            />
+            <PromptInputSubmit
+              status="ready"
+              disabled={!input.trim() || stage !== "awaiting-address"}
+              className="absolute bottom-1 right-1"
+            />
+          </Input>
+          {/* )} */}
           {stage === "awaiting-confirmation" && (
             <div className="flex gap-4 justify-center mt-4">
               <button
